@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8" />
+  <title>Hello world!</title>
+  <style>
+    ol {
+      list-style-type: none !important;
+      list-style: none !important;
+    }
+
+    li {
+      list-style-type: none !important;
+      list-style: none !important;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>{{title}}</h1>
+  <div style="margin-left: 10px;">
+    {{#each data}}
+    {{this.no}}. {{{this.soal}}}
+    <br>
+    <div style="margin-left: 20px;">
+      {{#each this.jawaban}}
+
+      {{#if this.isSelected}}
+
+      {{#if this.isCorrect}}
+      <input type="radio" / checked><span style="color: green;"> {{this.option}}. {{{this.jawaban}}}</span><br />
+
+      {{else}}
+
+      <input type="radio" / checked><span style="color: red;"> {{this.option}}. {{{this.jawaban}}}</span><br />
+      {{/if}}
+      {{else}}
+
+      {{#if this.isCorrect}}
+      <input type="radio" /><span style="color: green;"> {{this.option}}. {{{this.jawaban}}}</span><br />
+
+      {{else}}
+
+      <input type="radio" /><span style="color: black;"> {{this.option}}. {{{this.jawaban}}}</span><br />
+      {{/if}}
+
+      {{/if}}
+
+
+      {{/each}}
+      <br>
+      Pembahasan
+      <br>
+      {{{this.pembahasan}}}
+
+    </div>
+
+
+    <br>
+    <br />
+    {{/each}}
+  </div>
+</body>
+
+</html>

@@ -1,0 +1,478 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id               Int                @id @default(autoincrement())
+  email            String             @unique
+  name             String?
+  noWA             String?
+  jenisKelamin     enumGender         @default(L)
+  alamat           String?            @db.Text
+  provinsi         String?
+  kabupaten        String?
+  kecamatan        String?
+  password         String
+  gambar           String?            @default("public/DEFAULT_USER.png")
+  role             EnumRole           @default(USER)
+  verifyAt         DateTime?
+  jwtVersion       Int                @default(0)
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  NotificationUser NotificationUser[]
+  Pembelian        Pembelian[]
+  Tryout           Tryout[]
+}
+
+model BankSoalParentCategory {
+  id               Int                @id @default(autoincrement())
+  nama             String             @unique
+  keterangan       String?            @db.Text
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  BankSoalCategory BankSoalCategory[]
+}
+
+model BankSoalCategory {
+  id               Int                    @id @default(autoincrement())
+  parentCategoryId Int
+  parentCategory   BankSoalParentCategory @relation(fields: [parentCategoryId], references: [id], onDelete: Cascade)
+  nama             String
+  kkm              Int                    @default(0)
+  tipePenilaian    tipePenilaian          @default(BENAR_SALAH)
+  keterangan       String?                @db.Text
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
+  BankSoal         BankSoal[]
+  PaketLatihanSoal PaketLatihanSoal[]
+}
+
+model BankSoalSubCategory {
+  id        Int      @id @default(autoincrement())
+  value     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model BankSoal {
+  id              Int               @id @default(autoincrement())
+  categoryId      Int
+  soal            String            @db.Text
+  pembahasan      String            @db.Text
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  deletedAt       DateTime?
+  subCategory     String?           @db.Text
+  category        BankSoalCategory  @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  BankSoalJawaban BankSoalJawaban[]
+
+  @@index([categoryId], map: "BankSoal_categoryId_fkey")
+}
+
+model BankSoalJawaban {
+  id         Int      @id @default(autoincrement())
+  bankSoalId Int
+  jawaban    String   @db.Text
+  isCorrect  Boolean  @default(false)
+  point      Float    @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  bankSoal   BankSoal @relation(fields: [bankSoalId], references: [id], onDelete: Cascade)
+
+  @@index([bankSoalId], map: "BankSoalJawaban_bankSoalId_fkey")
+}
+
+model PaketCategory {
+  id               Int                @id @default(autoincrement())
+  nama             String
+  keterangan       String?            @db.Text
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  PaketSubCategory PaketSubCategory[]
+}
+
+model PaketSubCategory {
+  id              Int           @id @default(autoincrement())
+  nama            String
+  keterangan      String?       @db.Text
+  paketCategoryId Int
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  paketCategory   PaketCategory @relation(fields: [paketCategoryId], references: [id], onDelete: Cascade)
+
+  @@index([paketCategoryId], map: "PaketSubCategory_paketCategoryId_fkey")
+}
+
+model paketPembelianCategory {
+  id               Int            @id @default(autoincrement())
+  paketPembelianId Int
+  nama             String
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  paketPembelian   paketPembelian @relation(fields: [paketPembelianId], references: [id], onDelete: Cascade)
+
+  @@index([paketPembelianId], map: "paketPembelianCategory_paketPembelianId_fkey")
+}
+
+model paketPembelianMateri {
+  id               Int            @id @default(autoincrement())
+  paketPembelianId Int
+  nama             String
+  materi           String?        @db.Text
+  link             String?
+  category         String?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  paketPembelian   paketPembelian @relation(fields: [paketPembelianId], references: [id], onDelete: Cascade)
+
+  @@index([paketPembelianId], map: "paketPembelianMateri_paketPembelianId_fkey")
+}
+
+model paketPembelianBimbel {
+  id               Int                            @id @default(autoincrement())
+  paketPembelianId Int
+  date             DateTime
+  nama             String
+  mentor           String
+  materiLink       String?
+  videoLink        String?
+  rekamanLink      String?
+  createdAt        DateTime                       @default(now())
+  updatedAt        DateTime                       @updatedAt
+  paketLatihanId   Int?
+  status           enumStatusPaketPembelianBimbel @default(BELUM)
+  Tryout           Tryout[]
+  paketLatihan     PaketLatihan?                  @relation(fields: [paketLatihanId], references: [id])
+  paketPembelian   paketPembelian                 @relation(fields: [paketPembelianId], references: [id], onDelete: Cascade)
+
+  @@index([paketLatihanId], map: "paketPembelianBimbel_paketLatihanId_fkey")
+  @@index([paketPembelianId], map: "paketPembelianBimbel_paketPembelianId_fkey")
+}
+
+model paketPembelianFitur {
+  id               Int            @id @default(autoincrement())
+  paketPembelianId Int
+  nama             String
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  paketPembelian   paketPembelian @relation(fields: [paketPembelianId], references: [id], onDelete: Cascade)
+
+  @@index([paketPembelianId], map: "paketPembelianFitur_paketPembelianId_fkey")
+}
+
+model paketPembelianTryout {
+  id               Int                        @id @default(autoincrement())
+  paketPembelianId Int
+  paketLatihanId   Int?
+  limit            Int?                       @default(0)
+  isRandomQuestion Boolean                    @default(false)
+  startDate        DateTime?
+  endDate          DateTime?
+  createdAt        DateTime                   @default(now())
+  updatedAt        DateTime                   @updatedAt
+  type             enumTypePaketLatihanTryout @default(TRYOUT)
+  category         String?
+  Tryout           Tryout[]
+  PaketLatihan     PaketLatihan?              @relation(fields: [paketLatihanId], references: [id])
+  paketPembelian   paketPembelian             @relation(fields: [paketPembelianId], references: [id], onDelete: Cascade)
+
+  @@index([paketLatihanId], map: "paketPembelianTryout_paketLatihanId_fkey")
+  @@index([paketPembelianId], map: "paketPembelianTryout_paketPembelianId_fkey")
+}
+
+model paketPembelian {
+  id                     Int                      @id @default(autoincrement())
+  nama                   String
+  harga                  Int
+  keterangan             String?                  @db.Text
+  durasi                 Int                      @default(0)
+  gambar                 String?
+  createdAt              DateTime                 @default(now())
+  updatedAt              DateTime                 @updatedAt
+  panduan                String?                  @db.Text
+  paketLatihanId         Int?
+  isActive               Boolean                  @default(true)
+  requirement            String?                  @db.LongText
+  Pembelian              Pembelian[]
+  PaketLatihan           PaketLatihan?            @relation(fields: [paketLatihanId], references: [id])
+  paketPembelianBimbel   paketPembelianBimbel[]
+  paketPembelianCategory paketPembelianCategory[]
+  paketPembelianFitur    paketPembelianFitur[]
+  paketPembelianMateri   paketPembelianMateri[]
+  paketPembelianTryout   paketPembelianTryout[]
+  VoucherProduct         VoucherProduct[]
+
+  @@index([paketLatihanId], map: "paketPembelian_paketLatihanId_fkey")
+}
+
+model PaketLatihan {
+  id                   Int                    @id @default(autoincrement())
+  nama                 String
+  kkm                  Int
+  banner               String
+  isShareAnswer        Boolean                @default(false)
+  keterangan           String?                @db.Text
+  waktu                Int                    @default(0)
+  type                 enumTypePaketLatihan
+  startAt              DateTime?
+  endAt                DateTime?
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+  PaketLatihanSoal     PaketLatihanSoal[]
+  Tryout               Tryout[]
+  paketPembelian       paketPembelian[]
+  paketPembelianBimbel paketPembelianBimbel[]
+  paketPembelianTryout paketPembelianTryout[]
+}
+
+model PaketLatihanSoal {
+  id                 Int              @id @default(autoincrement())
+  paketLatihanId     Int
+  bankSoalCategoryId Int
+  isRandomQuestion   Boolean          @default(false)
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  bankSoalCategory   BankSoalCategory @relation(fields: [bankSoalCategoryId], references: [id], onDelete: Cascade)
+  paketLatihan       PaketLatihan     @relation(fields: [paketLatihanId], references: [id], onDelete: Cascade)
+
+  @@index([bankSoalCategoryId], map: "PaketLatihanSoal_bankSoalCategoryId_fkey")
+  @@index([paketLatihanId], map: "PaketLatihanSoal_paketLatihanId_fkey")
+}
+
+model Pembelian {
+  id                 Int                 @id @default(autoincrement())
+  userId             Int?
+  paketPembelianId   Int?
+  namaPaket          String?
+  duration           Int                 @default(0)
+  paymentUrl         String?
+  status             enumPembelianStatus
+  voucherCode        String?
+  voucherValue       Int                 @default(0)
+  voucherAlumniValue Int                 @default(0)
+  amount             Int                 @default(0)
+  invoice            String?             @unique
+  paymentMethod      String
+  requirement        String?             @db.LongText
+  paidAt             DateTime?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  expiredAt          DateTime?
+  paketPembelian     paketPembelian?     @relation(fields: [paketPembelianId], references: [id])
+  user               User?               @relation(fields: [userId], references: [id])
+
+  @@index([paketPembelianId], map: "Pembelian_paketPembelianId_fkey")
+  @@index([userId], map: "Pembelian_userId_fkey")
+}
+
+model Voucher {
+  id             Int                     @id @default(autoincrement())
+  kode           String?                 @unique
+  tipePotongan   enumTipePotonganVoucher
+  tipe           enumTipeVoucher         @default(NORMAL)
+  gambar         String
+  value          Int                     @default(0)
+  status         enumStatus
+  keterangan     String?                 @db.Text
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
+  deletedAt      DateTime?
+  VoucherProduct VoucherProduct[]
+}
+
+model VoucherProduct {
+  id             Int            @id @default(autoincrement())
+  voucherId      Int
+  paketId        Int
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  voucher        Voucher        @relation(fields: [voucherId], references: [id], onDelete: Cascade)
+  paketPembelian paketPembelian @relation(fields: [paketId], references: [id], onDelete: Cascade)
+
+  @@index([voucherId], map: "VoucherProduct_voucherId_fkey")
+  @@index([paketId], map: "VoucherProduct_paketId_fkey")
+}
+
+model Tryout {
+  id                     Int                   @id @default(autoincrement())
+  userId                 Int
+  paketLatihanId         Int?
+  point                  Float                 @default(0)
+  kkm                    Int                   @default(0)
+  maxPoint               Float                 @default(0)
+  finishAt               DateTime?
+  waktuPengerjaan        Int?                  @default(0)
+  createdAt              DateTime              @default(now())
+  updatedAt              DateTime              @updatedAt
+  paketPembelianBimbelId Int?
+  paketPembelianTryoutId Int?
+  paketLatihan           PaketLatihan?         @relation(fields: [paketLatihanId], references: [id])
+  paketPembelianBimbel   paketPembelianBimbel? @relation(fields: [paketPembelianBimbelId], references: [id])
+  paketPembelianTryout   paketPembelianTryout? @relation(fields: [paketPembelianTryoutId], references: [id])
+  user                   User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  TryoutSoal             TryoutSoal[]
+
+  @@index([paketLatihanId], map: "Tryout_paketLatihanId_fkey")
+  @@index([paketPembelianBimbelId], map: "Tryout_paketPembelianBimbelId_fkey")
+  @@index([paketPembelianTryoutId], map: "Tryout_paketPembelianTryoutId_fkey")
+  @@index([userId], map: "Tryout_userId_fkey")
+}
+
+model TryoutSoal {
+  id            Int           @id @default(autoincrement())
+  tryoutId      Int
+  soalId        Int
+  soal          String        @db.Text
+  jawaban       String?       @db.Text
+  jawabanShow   String?       @db.Text
+  jawabanSelect Int?
+  isCorrect     Boolean       @default(false)
+  pembahasan    String?       @db.Text
+  point         Float         @default(0)
+  kkm           Int           @default(0)
+  maxPoint      Float         @default(0)
+  sortSoal      Int           @default(0)
+  sortCategory  Int           @default(0)
+  category      String?
+  categoryKet   String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  duration      Int           @default(0)
+  subCategory   String?
+  isRaguRagu    Boolean       @default(false)
+  tipePenilaian tipePenilaian @default(BENAR_SALAH)
+  tryout        Tryout        @relation(fields: [tryoutId], references: [id], onDelete: Cascade)
+
+  @@index([tryoutId], map: "TryoutSoal_tryoutId_fkey")
+}
+
+model Event {
+  id         Int      @id @default(autoincrement())
+  nama       String
+  keterangan String?  @db.Text
+  gambar     String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model HomeSection {
+  id         Int                 @id @default(autoincrement())
+  title      String?
+  bintang    Int?
+  pekerjaan  String?
+  keterangan String?             @db.Text
+  url        String?
+  gambar     String?
+  createdAt  DateTime            @default(now())
+  updatedAt  DateTime            @updatedAt
+  tipe       enumHomeSectionTipe
+}
+
+model Notification {
+  id               Int                @id @default(autoincrement())
+  title            String?
+  keterangan       String?            @db.Text
+  url              String?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  icon             String?            @db.Text
+  NotificationUser NotificationUser[]
+}
+
+model NotificationUser {
+  id             Int                 @id @default(autoincrement())
+  userId         Int
+  notificationId Int?
+  isRead         Boolean             @default(false)
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+  title          String?
+  status         NotificationStatus?
+  type           NoticationType      @default(SYSTEM)
+  keterangan     String?             @db.Text
+  url            String?
+  notification   Notification?       @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  user           User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([notificationId], map: "NotificationUser_notificationId_fkey")
+  @@index([userId], map: "NotificationUser_userId_fkey")
+}
+
+enum EnumRole {
+  ADMIN
+  USER
+}
+
+enum enumGender {
+  L
+  P
+}
+
+enum tipePenilaian {
+  BENAR_SALAH
+  POINT
+}
+
+enum enumStatusPaketPembelianBimbel {
+  BELUM
+  SEDANG
+  SELESAI
+}
+
+enum enumTypePaketLatihanTryout {
+  TRYOUT
+  PENDAHULUAN
+  PEMANTAPAN
+  LATIHAN
+}
+
+enum enumTypePaketLatihan {
+  BIASA
+  TRYOUT
+}
+
+enum enumPembelianStatus {
+  UNPAID
+  PAID
+  REFUND
+  EXPIRED
+  FAILED
+}
+
+enum enumTipePotonganVoucher {
+  HARGA
+  PERSEN
+}
+
+enum enumTipeVoucher {
+  NORMAL
+  ALUMNI
+}
+
+enum enumStatus {
+  AKTIF
+  NONAKTIF
+}
+
+enum enumHomeSectionTipe {
+  BANNER
+  REVIEW
+  CUSTOM
+}
+
+enum NoticationType {
+  SYSTEM
+  USER
+}
+
+enum NotificationStatus {
+  PAYMENT_PENDING
+  PAYMENT_SUCCESS
+  PAYMENT_FAILED
+  BIMBEL_CHANGES
+}
