@@ -22,7 +22,7 @@ const get = async (req, res, next) => {
       sortBy: Joi.string().allow(''),
       descending: Joi.boolean(),
       filters: Joi.object({
-        email: Joi.string().email().allow('').optional(), // Tambahkan validasi untuk email
+        email: Joi.string().allow('').optional(), // Tambahkan validasi untuk email
         name: Joi.string().allow('').optional(), // Tambahkan validasi untuk name
         hasPurchase: Joi.boolean().optional(), // Validasi untuk hasPurchase
         packageId: Joi.number().integer().optional(), // Validasi untuk packageId
