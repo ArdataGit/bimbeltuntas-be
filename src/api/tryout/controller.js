@@ -454,8 +454,9 @@ const history = async (req, res, next) => {
     LIMIT ${validate.take}
     OFFSET ${validate.skip};`;
 
-    await result[0].forEach(async (e) => {
-      const getCat = await database.$queryRaw`
+    await Promise.all(
+      result[0].map(async (e) => {
+        const getCat = await database.$queryRaw`
            (
           SELECT
               JSON_ARRAYAGG(
@@ -478,9 +479,15 @@ const history = async (req, res, next) => {
           ) subquery
       )`;
 
-      //e.pointCategory = getCat[0]?.val ? getCat[0]?.val : [];
-      e.pointCategory = getCat[0]?.val ? JSON.parse(getCat[0]?.val) : [];
-    });
+        //e.pointCategory = getCat[0]?.val ? getCat[0]?.val : [];
+        const val = getCat[0]?.val;
+        e.pointCategory = val
+          ? typeof val === 'string'
+            ? JSON.parse(val)
+            : val
+          : [];
+      })
+    );
 
     result[1] =
       (await database.tryout.count({
@@ -551,8 +558,9 @@ const ranking = async (req, res, next) => {
     LIMIT ${validate.take}
     OFFSET ${validate.skip};`;
 
-    await getAll.forEach(async (e) => {
-      const getCat = await database.$queryRaw`
+    await Promise.all(
+      getAll.map(async (e) => {
+        const getCat = await database.$queryRaw`
          (
         SELECT
             JSON_ARRAYAGG(
@@ -574,8 +582,14 @@ const ranking = async (req, res, next) => {
             GROUP BY ts.category, ts.kkm, ts.maxPoint
         ) subquery
     )`;
-      e.pointCategory = getCat[0]?.val ? JSON.parse(getCat[0]?.val) : [];
-    });
+        const val = getCat[0]?.val;
+        e.pointCategory = val
+          ? typeof val === 'string'
+            ? JSON.parse(val)
+            : val
+          : [];
+      })
+    );
 
     const count = await database.$queryRaw`
       SELECT COUNT(*) AS total FROM (

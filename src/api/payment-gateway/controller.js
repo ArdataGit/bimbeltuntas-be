@@ -75,13 +75,40 @@ const getMerchantList = async (req, res, next) => {
         headers: {
           Authorization: `Bearer ${process.env.TRIPAY_API_KEY}`,
         },
+        timeout: 30000, // 30 second timeout
       }
     );
     res.json(result.data);
   } catch (error) {
+    // Handle specific error types
+    if (error.code === 'ECONNABORTED') {
+      return res.status(504).json({
+        success: false,
+        message: 'Gateway timeout - Tripay API took too long to respond'
+      });
+    }
+    
+    if (error.response) {
+      // API responded with error status
+      return res.status(error.response.status).json({
+        success: false,
+        message: error.response.data?.message || 'Error from payment gateway'
+      });
+    }
+    
+    if (error.request) {
+      // Request made but no response
+      return res.status(504).json({
+        success: false,
+        message: 'No response from payment gateway'
+      });
+    }
+    
+    // Other errors
     next(error);
   }
 };
+  
 const createPayment = async (req, res, next) => {
   try {
     const schema = Joi.object({

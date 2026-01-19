@@ -1,9 +1,9 @@
-const Joi = require('joi');
-const bcrypt = require('bcryptjs');
-const moment = require('moment');
-const database = require('#database');
-const { BadRequestError } = require('#errors');
-const { returnPagination, generateToken, deleteFile } = require('#utils');
+const Joi = require("joi");
+const bcrypt = require("bcryptjs");
+const moment = require("moment");
+const database = require("#database");
+const { BadRequestError } = require("#errors");
+const { returnPagination, generateToken, deleteFile } = require("#utils");
 
 const changeProfile = async (req, res, next) => {
   try {
@@ -29,9 +29,9 @@ const changeProfile = async (req, res, next) => {
       },
     });
 
-    if (!isExist) throw new BadRequestError('User tidak ditemukan');
+    if (!isExist) throw new BadRequestError("User tidak ditemukan");
 
-    if (req?.file?.path && isExist.gambar !== 'public/DEFAULT_USER.png') {
+    if (req?.file?.path && isExist.gambar !== "public/DEFAULT_USER.png") {
       deleteFile(isExist.banner);
     }
 
@@ -58,7 +58,7 @@ const changeProfile = async (req, res, next) => {
         user: result,
       },
 
-      msg: 'Berhasil mengubah profile',
+      msg: "Berhasil mengubah profile",
     });
   } catch (error) {
     next(error);
@@ -76,12 +76,12 @@ const checkVoucher = async (req, res, next) => {
     const result = await database.voucher.findFirst({
       where: {
         kode: validate.code,
-        status: 'AKTIF',
+        status: "AKTIF",
         deletedAt: null,
       },
     });
 
-    if (!result) throw new BadRequestError('Voucher tidak ditemukan');
+    if (!result) throw new BadRequestError("Voucher tidak ditemukan");
 
     const checkSpesificProduct = await database.voucherProduct.findMany({
       where: {
@@ -95,13 +95,13 @@ const checkVoucher = async (req, res, next) => {
       );
       if (!checkProduct)
         throw new BadRequestError(
-          'Voucher tidak bisa digunakan untuk produk ini'
+          "Voucher tidak bisa digunakan untuk produk ini"
         );
     }
 
     res.status(200).json({
       data: result,
-      msg: 'Berhasil menggunakan voucher',
+      msg: "Berhasil menggunakan voucher",
     });
   } catch (error) {
     next(error);
@@ -114,19 +114,19 @@ const getVoucherAlumni = async (req, res, next) => {
   const checkPembelian = await database.pembelian.findMany({
     where: {
       userId: req?.user?.id,
-      status: 'PAID',
+      status: "PAID",
     },
   });
 
   if (checkPembelian.length > 0) {
     result = await database.voucher.findFirst({
       where: {
-        tipe: 'ALUMNI',
-        status: 'AKTIF',
+        tipe: "ALUMNI",
+        status: "AKTIF",
         deletedAt: null,
       },
       orderBy: {
-        createdAt: 'desc',
+        createdAt: "desc",
       },
     });
   }
@@ -134,7 +134,7 @@ const getVoucherAlumni = async (req, res, next) => {
   try {
     return res.status(200).json({
       data: result,
-      msg: 'Get data success',
+      msg: "Get data success",
     });
   } catch (error) {
     next(error);
@@ -151,7 +151,7 @@ const findMyClass = async (req, res, next) => {
     const result = await database.pembelian.findFirst({
       where: {
         paketPembelianId: validate.id,
-        status: 'PAID',
+        status: "PAID",
         userId: req?.user?.id,
         OR: [
           {
@@ -234,10 +234,10 @@ const findMyClass = async (req, res, next) => {
       },
     });
 
-    if (!result) throw new BadRequestError('Data tidak ditemukan');
+    if (!result) throw new BadRequestError("Data tidak ditemukan");
     return res.status(200).json({
       data: result,
-      msg: 'Get data success',
+      msg: "Get data success",
     });
   } catch (error) {
     next(error);
@@ -250,7 +250,7 @@ const getMyClass = async (req, res, next) => {
       database.pembelian.findMany({
         where: {
           userId: req?.user?.id,
-          status: 'PAID',
+          status: "PAID",
           paketPembelianId: {
             not: null,
           },
@@ -292,7 +292,7 @@ const getMyClass = async (req, res, next) => {
       database.pembelian.count({
         where: {
           userId: req?.user?.id,
-          status: 'PAID',
+          status: "PAID",
         },
       }),
     ]);
@@ -306,7 +306,7 @@ const findLatihan = async (req, res, next) => {
   try {
     const schema = Joi.object({
       id: Joi.number().required(),
-      tryoutId: Joi.number().allow(null, '').optional(),
+      tryoutId: Joi.number().allow(null, "").optional(),
     });
     const validate = await schema.validateAsync({
       ...req.params,
@@ -338,13 +338,14 @@ const findLatihan = async (req, res, next) => {
         },
       },
     });
-    if (!result) throw new BadRequestError('Paket Latihan tidak ditemukan');
+    if (!result) throw new BadRequestError("Paket Latihan tidak ditemukan");
 
     if (validate.tryoutId) {
       const paketPembelianTryout =
         await database.paketPembelianTryout.findFirst({
           where: {
-            paketLatihanId: validate.id,
+            id: validate.tryoutId, // cocokkan langsung dengan ID tryout yang diminta
+            paketLatihanId: validate.id, // jaga-jaga untuk validasi double
           },
         });
       result.limit = paketPembelianTryout.limit;
@@ -362,7 +363,7 @@ const findLatihan = async (req, res, next) => {
     }
     res.status(200).json({
       data: result,
-      msg: 'Get data by id',
+      msg: "Get data by id",
     });
   } catch (error) {
     next(error);
@@ -386,7 +387,7 @@ const findTryout = async (req, res, next) => {
     };
 
     if (validate.isPembahasan)
-      where.finishAt = { [validate.isPembahasan ? 'lte' : 'gt']: new Date() };
+      where.finishAt = { [validate.isPembahasan ? "lte" : "gt"]: new Date() };
 
     const result = await database.Tryout.findFirst({
       where,
@@ -396,9 +397,9 @@ const findTryout = async (req, res, next) => {
     });
 
     if (!result?.paketLatihan?.isShareAnswer && validate.isPembahasan)
-      throw new BadRequestError('Tidak Tersedia Pembahasan');
+      throw new BadRequestError("Tidak Tersedia Pembahasan");
 
-    if (!result) throw new BadRequestError('Data tidak ditemukan');
+    if (!result) throw new BadRequestError("Data tidak ditemukan");
 
     const getAllSoalId = await database.tryoutSoal.findMany({
       where: {
@@ -412,10 +413,10 @@ const findTryout = async (req, res, next) => {
       },
       orderBy: [
         {
-          sortCategory: 'asc',
+          sortCategory: "asc",
         },
         {
-          sortSoal: 'asc',
+          sortSoal: "asc",
         },
       ],
     });
@@ -425,7 +426,7 @@ const findTryout = async (req, res, next) => {
 
         waktuTersisa:
           result.waktuPengerjaan -
-          moment().diff(moment(result.createdAt), 'seconds'),
+          moment().diff(moment(result.createdAt), "seconds"),
 
         soalId: getAllSoalId.map((e) => {
           return {
@@ -436,13 +437,13 @@ const findTryout = async (req, res, next) => {
               ? JSON.parse(e.jawaban).find(
                   (el) => el.isCorrect == true && e.jawabanSelect == el.id
                 )
-                ? 'BENAR'
-                : 'SALAH'
+                ? "BENAR"
+                : "SALAH"
               : null,
           };
         }),
       },
-      msg: 'Get data success',
+      msg: "Get data success",
     });
   } catch (error) {
     next(error);
@@ -481,14 +482,14 @@ const findSoalTryout = async (req, res, next) => {
       },
     });
 
-    if (!result) throw new BadRequestError('Data tidak ditemukan');
+    if (!result) throw new BadRequestError("Data tidak ditemukan");
 
     result.jawabanShow = JSON.parse(
       validate.isPembahasan ? result.jawaban : result.jawabanShow
     );
     return res.status(200).json({
       data: result,
-      msg: 'Get data success',
+      msg: "Get data success",
     });
   } catch (error) {
     next(error);
@@ -498,7 +499,7 @@ const findSoalTryout = async (req, res, next) => {
 const getAllCategory = async (req, res, next) => {
   try {
     const result = await database.paketPembelianCategory.groupBy({
-      by: ['nama'],
+      by: ["nama"],
 
       where: {
         paketPembelian: {
@@ -509,7 +510,7 @@ const getAllCategory = async (req, res, next) => {
 
     return res.status(200).json({
       data: result,
-      msg: 'Get data success',
+      msg: "Get data success",
     });
   } catch (error) {
     next(error);
@@ -530,14 +531,14 @@ const changePassword = async (req, res, next) => {
       },
     });
 
-    if (!user) throw new BadRequestError('User tidak ditemukan');
+    if (!user) throw new BadRequestError("User tidak ditemukan");
 
     const checkPassword = bcrypt.compareSync(
       validate.oldPassword,
       user.password
     );
 
-    if (!checkPassword) throw new BadRequestError('Password lama salah');
+    if (!checkPassword) throw new BadRequestError("Password lama salah");
 
     const hashPassword = bcrypt.hashSync(validate.password, 10);
 
@@ -552,7 +553,7 @@ const changePassword = async (req, res, next) => {
 
     res.status(200).json({
       data: result,
-      msg: 'Berhasil mengubah password',
+      msg: "Berhasil mengubah password",
     });
   } catch (error) {
     next(error);

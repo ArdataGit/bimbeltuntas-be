@@ -62,45 +62,78 @@ const register = async (req, res, next) => {
   }
 };
 
+//login satu akun hanya untuk satu device
+// const login = async (req, res, next) => {
+//   try {
+//     const schema = Joi.object({
+//       email: Joi.string().email().required(),
+//       password: Joi.string().min(8).required(),
+//     });
+
+//     const validate = await schema.validateAsync(req.body);
+
+//     const user = await database.User.findUnique({
+//       where: {
+//         email: validate.email,
+//       },
+//     });
+
+//     if (!user) throw new BadRequestError('Email belum terdaftar');
+
+//     const checkPassword = bcrypt.compareSync(validate.password, user.password);
+
+//     if (!checkPassword) throw new BadRequestError('Password salah');
+
+//     // if (!user.verifyAt) {
+//     //   throw new BadRequestError('Silahkan verifikasi email anda');
+//     // }
+
+//     await database.User.update({
+//       where: {
+//         id: user.id,
+//       },
+//       data: {
+//         jwtVersion: {
+//           increment: 1,
+//         },
+//       },
+//     });
+
+//     user.jwtVersion += 1;
+//     const token = generateToken(user);
+
+//     res.status(StatusCodes.OK).json({
+//       data: {
+//         token,
+//         user,
+//       },
+//       msg: 'Login Berhasil',
+//     });
+//   } catch (error) {
+//     next(error);
+//   }
+// };
+
 const login = async (req, res, next) => {
   try {
     const schema = Joi.object({
       email: Joi.string().email().required(),
       password: Joi.string().min(8).required(),
     });
-
     const validate = await schema.validateAsync(req.body);
-
     const user = await database.User.findUnique({
       where: {
         email: validate.email,
       },
     });
-
     if (!user) throw new BadRequestError('Email belum terdaftar');
-
     const checkPassword = bcrypt.compareSync(validate.password, user.password);
-
     if (!checkPassword) throw new BadRequestError('Password salah');
-
     // if (!user.verifyAt) {
-    //   throw new BadRequestError('Silahkan verifikasi email anda');
+    // throw new BadRequestError('Silahkan verifikasi email anda');
     // }
-
-    await database.User.update({
-      where: {
-        id: user.id,
-      },
-      data: {
-        jwtVersion: {
-          increment: 1,
-        },
-      },
-    });
-
-    user.jwtVersion += 1;
-    const token = generateToken(user);
-
+    // Hapus bagian increment jwtVersion di sini
+    const token = generateToken(user);  // Token baru dibuat tanpa invalidasi yang lama
     res.status(StatusCodes.OK).json({
       data: {
         token,

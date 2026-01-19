@@ -1,8 +1,7 @@
-const generateUniqueINV = () => {
-  const invoice = `INV-${Math.floor(Math.random() * 10 ** 7)
-    .toString()
-    .padStart(7, '0')}`;
+const crypto = require("crypto");
 
-  return invoice;
+const generateUniqueINV = () => {
+  return `INV-${crypto.randomUUID()}`;
 };
+
 module.exports = generateUniqueINV;

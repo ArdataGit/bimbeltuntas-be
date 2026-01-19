@@ -14,6 +14,8 @@ const {
   deleteUsersWithoutPurchases,
   deleteFilteredUsers,
 } = require('./controller');
+const getImportStatus = require('./getImportStatus');
+
 const { upload } = require('#utils');
 
 router.get('/get', get);
@@ -26,5 +28,7 @@ router.post('/import', upload('excel').single('file'), importExcel);
 router.get('/packages/get', getPaketPembelian);
 router.delete('/delete-no-purchases', deleteUsersWithoutPurchases);
 router.delete('/delete-filtered', deleteFilteredUsers);
+router.get('/import/status/:jobId', getImportStatus);
+
 
 module.exports = router;

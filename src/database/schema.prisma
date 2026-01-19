@@ -1,5 +1,6 @@
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
 }
 
 datasource db {
@@ -41,7 +42,6 @@ model BankSoalParentCategory {
 model BankSoalCategory {
   id               Int                    @id @default(autoincrement())
   parentCategoryId Int
-  parentCategory   BankSoalParentCategory @relation(fields: [parentCategoryId], references: [id], onDelete: Cascade)
   nama             String
   kkm              Int                    @default(0)
   tipePenilaian    tipePenilaian          @default(BENAR_SALAH)
@@ -49,7 +49,10 @@ model BankSoalCategory {
   createdAt        DateTime               @default(now())
   updatedAt        DateTime               @updatedAt
   BankSoal         BankSoal[]
+  parentCategory   BankSoalParentCategory @relation(fields: [parentCategoryId], references: [id], onDelete: Cascade)
   PaketLatihanSoal PaketLatihanSoal[]
+
+  @@index([parentCategoryId], map: "BankSoalCategory_parentCategoryId_fkey")
 }
 
 model BankSoalSubCategory {
@@ -125,9 +128,9 @@ model paketPembelianMateri {
   nama             String
   materi           String?        @db.Text
   link             String?
-  category         String?
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
+  category         String?
   paketPembelian   paketPembelian @relation(fields: [paketPembelianId], references: [id], onDelete: Cascade)
 
   @@index([paketPembelianId], map: "paketPembelianMateri_paketPembelianId_fkey")
@@ -170,13 +173,13 @@ model paketPembelianTryout {
   paketPembelianId Int
   paketLatihanId   Int?
   limit            Int?                       @default(0)
-  isRandomQuestion Boolean                    @default(false)
-  startDate        DateTime?
-  endDate          DateTime?
   createdAt        DateTime                   @default(now())
   updatedAt        DateTime                   @updatedAt
   type             enumTypePaketLatihanTryout @default(TRYOUT)
+  endDate          DateTime?
+  startDate        DateTime?
   category         String?
+  isRandomQuestion Boolean                    @default(false)
   Tryout           Tryout[]
   PaketLatihan     PaketLatihan?              @relation(fields: [paketLatihanId], references: [id])
   paketPembelian   paketPembelian             @relation(fields: [paketPembelianId], references: [id], onDelete: Cascade)
@@ -199,13 +202,13 @@ model paketPembelian {
   isActive               Boolean                  @default(true)
   requirement            String?                  @db.LongText
   Pembelian              Pembelian[]
+  VoucherProduct         VoucherProduct[]
   PaketLatihan           PaketLatihan?            @relation(fields: [paketLatihanId], references: [id])
   paketPembelianBimbel   paketPembelianBimbel[]
   paketPembelianCategory paketPembelianCategory[]
   paketPembelianFitur    paketPembelianFitur[]
   paketPembelianMateri   paketPembelianMateri[]
   paketPembelianTryout   paketPembelianTryout[]
-  VoucherProduct         VoucherProduct[]
 
   @@index([paketLatihanId], map: "paketPembelian_paketLatihanId_fkey")
 }
@@ -215,6 +218,7 @@ model PaketLatihan {
   nama                 String
   kkm                  Int
   banner               String
+  pdf                  String?
   isShareAnswer        Boolean                @default(false)
   keterangan           String?                @db.Text
   waktu                Int                    @default(0)
@@ -234,9 +238,9 @@ model PaketLatihanSoal {
   id                 Int              @id @default(autoincrement())
   paketLatihanId     Int
   bankSoalCategoryId Int
-  isRandomQuestion   Boolean          @default(false)
   createdAt          DateTime         @default(now())
   updatedAt          DateTime         @updatedAt
+  isRandomQuestion   Boolean          @default(false)
   bankSoalCategory   BankSoalCategory @relation(fields: [bankSoalCategoryId], references: [id], onDelete: Cascade)
   paketLatihan       PaketLatihan     @relation(fields: [paketLatihanId], references: [id], onDelete: Cascade)
 
@@ -291,8 +295,8 @@ model VoucherProduct {
   paketId        Int
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
-  voucher        Voucher        @relation(fields: [voucherId], references: [id], onDelete: Cascade)
   paketPembelian paketPembelian @relation(fields: [paketId], references: [id], onDelete: Cascade)
+  voucher        Voucher        @relation(fields: [voucherId], references: [id], onDelete: Cascade)
 
   @@index([voucherId], map: "VoucherProduct_voucherId_fkey")
   @@index([paketId], map: "VoucherProduct_paketId_fkey")
@@ -311,6 +315,7 @@ model Tryout {
   updatedAt              DateTime              @updatedAt
   paketPembelianBimbelId Int?
   paketPembelianTryoutId Int?
+  pointCategory          Json?
   paketLatihan           PaketLatihan?         @relation(fields: [paketLatihanId], references: [id])
   paketPembelianBimbel   paketPembelianBimbel? @relation(fields: [paketPembelianBimbelId], references: [id])
   paketPembelianTryout   paketPembelianTryout? @relation(fields: [paketPembelianTryoutId], references: [id])
@@ -336,16 +341,16 @@ model TryoutSoal {
   point         Float         @default(0)
   kkm           Int           @default(0)
   maxPoint      Float         @default(0)
-  sortSoal      Int           @default(0)
-  sortCategory  Int           @default(0)
   category      String?
   categoryKet   String?
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
   duration      Int           @default(0)
   subCategory   String?
-  isRaguRagu    Boolean       @default(false)
   tipePenilaian tipePenilaian @default(BENAR_SALAH)
+  isRaguRagu    Boolean       @default(false)
+  sortCategory  Int           @default(0)
+  sortSoal      Int           @default(0)
   tryout        Tryout        @relation(fields: [tryoutId], references: [id], onDelete: Cascade)
 
   @@index([tryoutId], map: "TryoutSoal_tryoutId_fkey")

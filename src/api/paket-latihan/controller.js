@@ -1,8 +1,8 @@
-const Joi = require('joi');
+const Joi = require("joi");
 
-const database = require('#database');
-const { returnPagination, filterToJson, deleteFile } = require('#utils');
-const { BadRequestError } = require('#errors');
+const database = require("#database");
+const { returnPagination, filterToJson, deleteFile } = require("#utils");
+const { BadRequestError } = require("#errors");
 
 const get = async (req, res, next) => {
   try {
@@ -22,7 +22,7 @@ const get = async (req, res, next) => {
         ...(validate.take === 0 ? {} : { take: validate.take }),
         // take: validate.take === 0 ? 10 : validate.take,
         orderBy: {
-          [validate.sortBy]: validate.descending ? 'desc' : 'asc',
+          [validate.sortBy]: validate.descending ? "desc" : "asc",
         },
         where: filterToJson(validate),
         include: {
@@ -55,18 +55,18 @@ const getPenjualan = async (req, res, next) => {
 
     const validate = await schema.validateAsync(req.query);
 
-    const userName = validate?.filters?.userName || '';
+    const userName = validate?.filters?.userName || "";
     delete validate?.filters?.userName;
 
     let filterStatus = validate?.filters?.status || undefined;
     delete validate?.filters?.status;
 
-    const namaPaket = validate?.filters?.namaPaket || '';
+    const namaPaket = validate?.filters?.namaPaket || "";
     delete validate?.filters?.namaPaket;
 
     let filterExpired = {};
 
-    if (filterStatus === 'PAID') {
+    if (filterStatus === "PAID") {
       filterExpired = {
         OR: [
           {
@@ -81,14 +81,14 @@ const getPenjualan = async (req, res, next) => {
       };
     }
 
-    if (filterStatus === 'OVERDUE') {
+    if (filterStatus === "OVERDUE") {
       filterExpired = {
         expiredAt: {
           lt: new Date(),
         },
       };
 
-      filterStatus = 'PAID';
+      filterStatus = "PAID";
     }
 
     const result = await database.$transaction([
@@ -99,7 +99,7 @@ const getPenjualan = async (req, res, next) => {
           user: true,
         },
         orderBy: {
-          [validate.sortBy]: validate.descending ? 'desc' : 'asc',
+          [validate.sortBy]: validate.descending ? "desc" : "asc",
         },
         where: {
           ...validate.filters,
@@ -153,10 +153,10 @@ const find = async (req, res, next) => {
         id: validate.id,
       },
     });
-    if (!result) throw new BadRequestError('Paket Latihan tidak ditemukan');
+    if (!result) throw new BadRequestError("Paket Latihan tidak ditemukan");
     res.status(200).json({
       data: result,
-      msg: 'Get data by id',
+      msg: "Get data by id",
     });
   } catch (error) {
     next(error);
@@ -167,29 +167,31 @@ const insert = async (req, res, next) => {
   try {
     const schema = Joi.object({
       nama: Joi.string().required(),
-      type: Joi.string().valid('BIASA', 'TRYOUT').required(),
+      type: Joi.string().valid("BIASA", "TRYOUT").required(),
       startAt:
-        req.body.type === 'TRYOUT'
+        req.body.type === "TRYOUT"
           ? Joi.date().required()
           : Joi.date().allow(null),
       endAt:
-        req.body.type === 'TRYOUT'
+        req.body.type === "TRYOUT"
           ? Joi.date().required()
           : Joi.date().allow(null),
       waktu:
-        req.body.type === 'BIASA'
+        req.body.type === "BIASA"
           ? Joi.number().required()
           : Joi.number().allow(null),
       kkm: Joi.number().allow(null).default(0),
       banner: Joi.string().required(),
+      pdf: Joi.string().allow(null), // tambah validasi pdf
       isShareAnswer: Joi.boolean().required(),
-      keterangan: Joi.allow(null, ''),
+      keterangan: Joi.allow(null, ""),
     });
 
     const validate = await schema.validateAsync(
       {
         ...req.body,
-        banner: req.file?.path,
+        banner: req.files?.banner?.[0]?.path,
+        pdf: req.files?.pdf?.[0]?.path || null,
       },
       {
         stripUnknown: true,
@@ -202,7 +204,7 @@ const insert = async (req, res, next) => {
 
     res.status(200).json({
       data: result,
-      msg: 'Berhasil menambahkan paket latihan',
+      msg: "Berhasil menambahkan paket latihan",
     });
   } catch (error) {
     next(error);
@@ -214,58 +216,56 @@ const update = async (req, res, next) => {
     const schema = Joi.object({
       id: Joi.number().required(),
       nama: Joi.string().required(),
-      type: Joi.string().valid('BIASA', 'TRYOUT').required(),
+      type: Joi.string().valid("BIASA", "TRYOUT").required(),
       startAt:
-        req.body.type === 'TRYOUT'
+        req.body.type === "TRYOUT"
           ? Joi.date().required()
           : Joi.date().allow(null),
       endAt:
-        req.body.type === 'TRYOUT'
+        req.body.type === "TRYOUT"
           ? Joi.date().required()
           : Joi.date().allow(null),
       waktu:
-        req.body.type === 'BIASA'
+        req.body.type === "BIASA"
           ? Joi.number().required()
           : Joi.number().allow(null),
       kkm: Joi.number().allow(null).default(0),
       banner: Joi.string(),
+      pdf: Joi.string().allow(null),
       isShareAnswer: Joi.boolean().required(),
-      keterangan: Joi.allow(null, ''),
+      keterangan: Joi.allow(null, ""),
     });
 
     const validate = await schema.validateAsync(
       {
         ...req.body,
-        banner: req?.file?.path,
         id: req.params.id,
+        banner: req.files?.banner?.[0]?.path,
+        pdf: req.files?.pdf?.[0]?.path || null,
       },
-      {
-        stripUnknown: true,
-      }
+      { stripUnknown: true }
     );
 
     const isExist = await database.paketLatihan.findUnique({
-      where: {
-        id: validate.id,
-      },
+      where: { id: validate.id },
     });
 
-    if (!isExist) throw new BadRequestError('Paket latihan tidak ditemukan');
+    if (!isExist) throw new BadRequestError("Paket latihan tidak ditemukan");
 
-    if (req?.file?.path) {
-      deleteFile(isExist.banner);
-    }
+    if (req.files?.banner?.[0]?.path) deleteFile(isExist.banner);
+    if (req.files?.pdf?.[0]?.path && isExist.pdf) deleteFile(isExist.pdf);
+
+    // Remove id from data
+    const { id, ...dataWithoutId } = validate;
 
     const result = await database.paketLatihan.update({
-      where: {
-        id: validate.id,
-      },
-      data: validate,
+      where: { id },
+      data: dataWithoutId,
     });
 
     res.status(200).json({
       data: result,
-      msg: 'Berhasil mengubah paket latihan',
+      msg: "Berhasil mengubah paket latihan",
     });
   } catch (error) {
     next(error);
@@ -286,7 +286,7 @@ const remove = async (req, res, next) => {
       },
     });
 
-    if (!isExist) throw new BadRequestError('Kategori tidak ditemukan');
+    if (!isExist) throw new BadRequestError("Kategori tidak ditemukan");
 
     const result = await database.paketLatihan.delete({
       where: {
@@ -296,7 +296,7 @@ const remove = async (req, res, next) => {
 
     res.status(200).json({
       data: result,
-      msg: 'Berhasil menghapus kategori paket latihan',
+      msg: "Berhasil menghapus kategori paket latihan",
     });
   } catch (error) {
     next(error);
@@ -317,33 +317,33 @@ const finishPayment = async (req, res, next) => {
       },
     });
 
-    if (!checkPembelian) throw new BadRequestError('Pembelian tidak ditemukan');
+    if (!checkPembelian) throw new BadRequestError("Pembelian tidak ditemukan");
 
-    if (checkPembelian.status === 'PAID')
-      throw new BadRequestError('Pembelian sudah selesai');
+    if (checkPembelian.status === "PAID")
+      throw new BadRequestError("Pembelian sudah selesai");
 
     await database.pembelian.update({
       where: {
         id: validate.id,
       },
       data: {
-        status: 'PAID',
+        status: "PAID",
         paidAt: new Date(),
       },
     });
     await database.notificationUser.create({
       data: {
         user: { connect: { id: checkPembelian.userId } },
-        title: 'Pembelian Berhasil',
+        title: "Pembelian Berhasil",
         keterangan: `Anda telah membeli paket ${checkPembelian.namaPaket}, silahkan cek paket anda di halaman riwayat pembelian`,
-        url: '/paket-pembelian/riwayat',
-        type: 'SYSTEM',
-        status: 'PAYMENT_SUCCESS',
+        url: "/paket-pembelian/riwayat",
+        type: "SYSTEM",
+        status: "PAYMENT_SUCCESS",
       },
     });
 
     return res.status(200).json({
-      msg: 'Pembayaran berhasil',
+      msg: "Pembayaran berhasil",
     });
   } catch (error) {
     next(error);

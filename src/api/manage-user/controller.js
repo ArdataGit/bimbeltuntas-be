@@ -3,8 +3,8 @@ const moment = require('moment');
 const bcrypt = require('bcryptjs');
 const excelJS = require('exceljs');
 const { default: readXlsxFile } = require('read-excel-file/node');
+const importExcelQueue = require('../../queues/importExcelQueue');
 const fs = require('fs');
-
 const database = require('#database');
 const {
   returnPagination,
@@ -22,15 +22,13 @@ const get = async (req, res, next) => {
       sortBy: Joi.string().allow(''),
       descending: Joi.boolean(),
       filters: Joi.object({
-        email: Joi.string().allow('').optional(), // Tambahkan validasi untuk email
-        name: Joi.string().allow('').optional(), // Tambahkan validasi untuk name
-        hasPurchase: Joi.boolean().optional(), // Validasi untuk hasPurchase
-        packageId: Joi.number().integer().optional(), // Validasi untuk packageId
+        email: Joi.string().allow('').optional(),
+        name: Joi.string().allow('').optional(),
+        hasPurchase: Joi.boolean().optional(),
+        packageId: Joi.number().integer().optional(),
       }).optional(),
     });
-
     const validate = await schema.validateAsync(req.query);
-
     const result = await database.$transaction([
       database.User.findMany({
         skip: validate.skip,
@@ -51,19 +49,17 @@ const get = async (req, res, next) => {
         where: filterToJson(validate),
       }),
     ]);
-
     return returnPagination(req, res, result);
   } catch (error) {
     next(error);
   }
 };
+
 const excel = async (req, res, next) => {
   try {
     const workbook = new excelJS.Workbook();
     const worksheet = workbook.addWorksheet('Users');
-
     const User = await database.User.findMany({});
-
     worksheet.columns = [
       { header: 'Nama Lengkap', key: 'name', width: 15 },
       { header: 'Email', key: 'email', width: 15 },
@@ -81,174 +77,176 @@ const excel = async (req, res, next) => {
         createdAt: moment(user.createdAt).format('DD-MM-YYYY HH:mm'),
       });
     });
-
     res.setHeader(
       'Content-Type',
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     );
     res.setHeader('Content-Disposition', 'attachment; filename=users.xlsx');
-
     workbook.xlsx.write(res).then(() => res.end());
   } catch (error) {
     next(error);
   }
 };
 
-const importExcel = async (req, res, next) => {
-  try {
-    const exFile = `${__dirname}/../../../${req.file.path}`;
-    const error = [];
-
-    const rows = await readXlsxFile(fs.createReadStream(exFile));
-    rows.shift(); // Menghapus header jika ada
-
-    // Menggunakan map untuk melakukan async operation pada setiap row dan Promise.all untuk menunggu semua selesai
-    await Promise.all(
-      rows.map(async (row, index) => {
-        if (!row[0] || !row[1]) {
-          return error.push(`Row ${index + 1}, Email dan Password harus diisi`);
-        }
-
-        if (row[1].length < 8) {
-          return error.push(`Row ${index + 1}, Password minimal 8 karakter`);
-        }
-
-        // check if email is valid
-        const emailRegex = /\S+@\S+\.\S+/;
-        if (!emailRegex.test(row[0])) {
-          return error.push(`Row ${index + 1}, Email tidak valid`);
-        }
-
-        const isEmailExist = await database.User.findMany({
-          where: {
-            email: row[0],
-          },
+async function validateRows(rows) {
+  const errors = [];
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    const rowNum = i + 1;
+    const email = row[0];
+    const password = row[1];
+    const paketVal = row?.[2];
+    if (!email || !password) {
+      errors.push(`Row ${rowNum}, Email dan Password harus diisi`);
+      continue;
+    }
+    if (String(password).length < 8) {
+      errors.push(`Row ${rowNum}, Password minimal 8 karakter`);
+      continue;
+    }
+    const emailRegex = /\S+@\S+\.\S+/;
+    if (!emailRegex.test(String(email))) {
+      errors.push(`Row ${rowNum}, Email tidak valid`);
+      continue;
+    }
+    // Validasi paket jika ada
+    if (paketVal) {
+      const paketArray = parsePaketIds(paketVal);
+      for (const pid of paketArray) {
+        const exists = await database.paketPembelian.findUnique({
+          where: { id: pid },
+          select: { id: true },
         });
-
-        if (isEmailExist?.length > 0) {
-          return error.push(
-            `Row ${index + 1},  Email Telah digunakan (${row[0]})`
-          );
+        if (!exists) {
+          errors.push(`Row ${rowNum}, Paket Pembelian id ${pid} tidak ditemukan`);
         }
+      }
+    }
+  }
+  return errors;
+}
 
-        if (row?.[2]) {
-          const val = String(row?.[2]);
-          const array = val.includes('|')
-            ? val.split('|').map(Number)
-            : [Number(val)];
-
-          await Promise.all(
-            array.map(async (id) => {
-              const checkingPaket = await database.paketPembelian.findUnique({
-                where: {
-                  id,
-                },
-              });
-
-              if (!checkingPaket) {
-                error.push(
-                  `Row ${
-                    index + 1
-                  }, Paket Pembelian dengan id ${id} tidak ditemukan`
-                );
-              }
-            })
-          );
-        }
-      })
-    );
-
-    if (error.length > 0) {
-      return res.status(400).json({
-        error,
-        msg: 'Gagal import data',
+async function processRow(row) {
+  const email = String(row[0]);
+  const rawPassword = String(row[1]);
+  const paketArray = parsePaketIds(row?.[2]);
+  await database.$transaction(async (tx) => {
+    // cek user
+    const existingUser = await tx.User.findUnique({
+      where: { email },
+      select: { id: true },
+    });
+    let userId;
+    if (existingUser) {
+      // update password saja
+      await tx.User.update({
+        where: { id: existingUser.id },
+        data: { password: bcrypt.hashSync(rawPassword, 10) },
+      });
+      userId = existingUser.id;
+      // hapus semua pembelian lama
+      await tx.Pembelian.deleteMany({
+        where: { userId },
+      });
+    } else {
+      // buat user baru
+      const newUser = await tx.User.create({
+        data: {
+          email,
+          password: bcrypt.hashSync(rawPassword, 10),
+        },
+        select: { id: true },
+      });
+      userId = newUser.id;
+    }
+    // buat pembelian baru
+    for (const pid of paketArray) {
+      const paket = await tx.paketPembelian.findUnique({
+        where: { id: pid },
+      });
+      if (!paket) continue;
+      const expiredAt = paket.durasi
+        ? moment().add(paket.durasi * 31, 'days').toDate()
+        : null;
+      await tx.Pembelian.create({
+        data: {
+          user: { connect: { id: userId } },
+          paketPembelian: { connect: { id: pid } },
+          status: 'PAID',
+          requirement: null,
+          duration: paket.durasi,
+          expiredAt,
+          namaPaket: paket.nama,
+          amount: 0,
+          invoice: generateUniqueINV(),
+          paymentMethod: 'PENDAFTARAN',
+          paidAt: new Date(),
+        },
       });
     }
+  });
+  // kirim email setelah commit
+  sendMail({
+    to: email,
+    subject: 'Selamat Datang di Tuntas CBT UKAI',
+    template: 'welcome.html',
+    name: email,
+    url: `${process.env.URL_CLIENT}`,
+    email,
+    password: rawPassword,
+  });
+}
 
-    await Promise.all(
-      rows.map(async (row) => {
-        // Contoh operasi pembuatan user
-        const user = await database.User.create({
-          data: {
-            email: row[0],
-            password: bcrypt.hashSync(row[1], 10),
-          },
-        });
+function parsePaketIds(paketVal) {
+  if (!paketVal) return [];
+  return String(paketVal)
+    .split('|')
+    .map(v => Number(v))
+    .filter(v => !Number.isNaN(v));
+}
 
-        if (row?.[2]) {
-          const val = String(row?.[2]);
-          const array = val.includes('|')
-            ? val.split('|').map(Number)
-            : [Number(val)];
+const path = require("path");
+const os = require("os");
 
-          await Promise.all(
-            array.map(async (id) => {
-              const getPaket = await database.paketPembelian.findUnique({
-                where: {
-                  id,
-                },
-              });
+const importExcel = async (req, res, next) => {
+  try {
+    const filePath = `${__dirname}/../../../${req.file.path}`;
 
-              await database.pembelian.create({
-                data: {
-                  user: { connect: { id: user.id } }, // Assuming you want to associate the purchase with a user
-                  paketPembelian: { connect: { id } },
-                  status: 'PAID',
-                  requirement: null,
-                  duration: getPaket.durasi,
-                  expiredAt: getPaket.durasi
-                    ? moment()
-                        .add(getPaket.durasi * 31, 'days')
-                        .toDate()
-                    : null,
-                  namaPaket: getPaket.nama,
-                  amount: 0,
-                  invoice: generateUniqueINV(),
-                  paymentMethod: 'PENDAFTARAN',
-                  paidAt: new Date(),
-                },
-              });
-            })
-          );
-        }
+    // BACA FILE DULU UNTUK HITUNG ROW
+    const rows = await readXlsxFile(fs.createReadStream(filePath));
+    rows.shift(); // hapus header
 
-        sendMail({
-          to: user.email,
-          subject: 'Selamat Datang di Tuntas CBT UKAI',
-          template: 'welcome.html',
-          name: row[0],
-          url: `${process.env.URL_CLIENT}`,
-          email: row[0],
-          password: row[1],
-        });
-      })
-    );
+    const totalRows = rows.length;
 
-    res.status(200).json({
-      data: null,
-      msg: 'User created',
+    // MASUKKAN KE QUEUE
+    const job = await importExcelQueue.add("import", {
+      filePath
     });
-  } catch (error) {
-    next(error);
+
+    return res.status(200).json({
+      msg: "File berhasil diupload, proses import berjalan di background",
+      jobId: job.id,
+      totalRows
+    });
+
+  } catch (err) {
+    next(err);
   }
 };
+
 
 const find = async (req, res, next) => {
   try {
     const schema = Joi.object({
       id: Joi.number().required(),
     });
-
     const validate = await schema.validateAsync(req.params);
-
     const result = await database.User.findUnique({
       where: {
         id: validate.id,
       },
     });
-
     if (!result) throw new BadRequestError('User dengan tidak ditemukan');
-
     res.status(200).json({
       data: result,
       msg: 'Get data by id',
@@ -271,17 +269,13 @@ const insert = async (req, res, next) => {
       kabupaten: Joi.string().allow(''),
       kecamatan: Joi.string().allow(''),
     }).unknown();
-
     const validate = await schema.validateAsync(req.body);
-
     const isEmailExist = await database.User.findUnique({
       where: {
         email: validate.email,
       },
     });
-
     if (isEmailExist) throw new BadRequestError('Email telah digunakan');
-
     const result = await database.User.create({
       data: {
         ...validate,
@@ -289,7 +283,6 @@ const insert = async (req, res, next) => {
         password: bcrypt.hashSync(validate.password, 10),
       },
     });
-
     sendMail({
       to: validate.email,
       subject: 'Selamat Datang di Tuntas CBT UKAI',
@@ -299,7 +292,6 @@ const insert = async (req, res, next) => {
       email: validate.email,
       password: validate.password,
     });
-
     res.status(201).json({
       data: result,
       msg: 'Create data',
@@ -323,49 +315,41 @@ const update = async (req, res, next) => {
       password: Joi.string().min(8).allow(''),
       email: Joi.string().email(),
     }).unknown();
-
     const validate = await schema.validateAsync({
       ...req.params,
       ...req.body,
     });
-
     const isExist = await database.User.findUnique({
       where: {
         id: validate.id,
       },
     });
-
     if (validate.email && validate.email !== isExist.email) {
       const isEmailExist = await database.User.findUnique({
         where: {
           email: validate.email,
         },
       });
-
       if (isEmailExist) throw new BadRequestError('Email telah digunakan');
     }
-
     if (validate.password) {
       validate.password = bcrypt.hashSync(validate.password, 10);
     } else {
       delete validate.password;
     }
     if (!isExist) throw new BadRequestError('User tidak ditemukan');
-
     delete validate.Pembelian;
     const payload = validate;
     delete payload.id;
     delete payload.key;
     delete payload.rowIndex;
     // delete payload.createdAt;
-
     const result = await database.User.update({
       where: {
         id: isExist.id,
       },
       data: payload,
     });
-
     res.status(200).json({
       data: result,
       msg: 'Berhasil mengubah data user',
@@ -380,9 +364,7 @@ const remove = async (req, res, next) => {
     const schema = Joi.object({
       ids: Joi.array().items(Joi.number()).required(),
     });
-
     const validate = await schema.validateAsync(req.body);
-
     const result = await database.User.deleteMany({
       where: {
         id: {
@@ -390,7 +372,6 @@ const remove = async (req, res, next) => {
         },
       },
     });
-
     res.status(200).json({
       data: result,
       msg: 'Berhasil menghapus data user',
@@ -411,7 +392,6 @@ const getPaketPembelian = async (req, res, next) => {
         nama: true, // Nama paket
       },
     });
-
     res.status(200).json({
       data: paketList,
       msg: 'Berhasil mengambil data paket',
@@ -431,7 +411,6 @@ const deleteUsersWithoutPurchases = async (req, res, next) => {
         },
       },
     });
-
     res.status(200).json({
       message: `${deletedUsers.count} user(s) tanpa pembelian berhasil dihapus`,
     });
@@ -443,15 +422,12 @@ const deleteUsersWithoutPurchases = async (req, res, next) => {
 const deleteFilteredUsers = async (req, res, next) => {
   try {
     const { filters } = req.body; // Terima filter dari frontend
-
     // Bangun query `where` berdasarkan filter
     const whereClause = filterToJson({ filters });
-
     // Hapus data yang sesuai dengan filter
     const deletedUsers = await database.User.deleteMany({
       where: whereClause,
     });
-
     res.status(200).json({
       message: `${deletedUsers.count} user(s) berhasil dihapus`,
     });
