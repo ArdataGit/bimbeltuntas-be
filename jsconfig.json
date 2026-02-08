@@ -1,0 +1,12 @@
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "#api/*": ["src/api/*"],
+      "#utils": ["src/utils/index.js"],
+      "#database": ["src/database/index.js"],
+      "#errors": ["src/errors/index.js"],
+      "#middlewares": ["src/middlewares/index.js"],
+    }
+  }
+}

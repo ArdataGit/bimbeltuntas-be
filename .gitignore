@@ -1,0 +1,49 @@
+node_modules
+node_modules/
+public
+public/
+zi8tBC5i
+output.pdf
+www.zip
+.env
+logs/
+
+
+# ===== SYSTEM =====
+.DS_Store
+Thumbs.db
+nohup.out
+*.log
+
+# ===== NODE =====
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ===== ENV / SECRET =====
+.env
+.env.*
+*.pem
+*.key
+
+# ===== BUILD / OUTPUT =====
+dist/
+build/
+output.pdf
+
+# ===== ARCHIVE / ZIP =====
+*.zip
+*.rar
+*.7z
+
+# ===== IDE =====
+.vscode/
+.idea/
+
+# ===== TEMP / TEST FILE =====
+test.html
+
+# ===== OPTIONAL =====
+coverage/
+.cache/
