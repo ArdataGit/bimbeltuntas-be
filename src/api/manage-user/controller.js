@@ -25,6 +25,7 @@ const get = async (req, res, next) => {
         email: Joi.string().allow('').optional(),
         name: Joi.string().allow('').optional(),
         hasPurchase: Joi.boolean().optional(),
+        noWA: Joi.string().allow('').optional(),
         packageId: Joi.number().integer().optional(),
       }).optional(),
     });
